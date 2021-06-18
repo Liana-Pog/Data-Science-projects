@@ -1,0 +1,13 @@
+name: Group_Homework
+title: Group_Homework
+username:
+account: lianapoghosyan13
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2605563
+bundleId: 3426790
+url: https://lianapoghosyan13.shinyapps.io/Group_Homework/
+when: 1595521900.66144
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: Group_HW.Rmd

@@ -1,0 +1,455 @@
+---
+title: "Group Homework"
+author: "Ani Jeyranyan, Liana Poghosyan, Mahta Reza Yazdi, Julieta Aghakaryan, Stepan Nshanyan"
+date: "23.07.2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, echo=F, message=F, warning=F}
+knitr::opts_chunk$set(echo = TRUE, warning=T, message = T)
+library(rvest)
+library(dplyr)
+library(stringr)
+library(RCurl)
+library(ggplot2)
+library(httr)
+library(DataExplorer)
+library(knitr)
+library(kableExtra)
+
+```
+
+![image1](InventorsandInventionsPack.jpg)\
+
+
+# Introduction to the Project
+
+The goal of this project is to use Web scraping and API approaches to scrap text data and do text mining on it by the help of techniques and skilled gained during our course. Our group has also produced a ShinyApp data product for the project.
+
+The tasks in this project are
+
+* Get a reasonable Data using Web scraping techniques
+* Do text Mining and Data Cleaning on the data
+* Perform exploratory analysis on dataset
+
+The **topic of the project** is **Inventors and their Inventions**. The text data about different inventors' *Names, Born year, Death Year, Country* and *Inventions* are scrapped from Wikipedia\
+(https://en.wikipedia.org/wiki/List_of_inventors).
+
+
+The ShinyApp uses analysis done in the project. You can find it in the link below:\
+https://anijeyranyan.shinyapps.io/Group_Homework/
+
+\newpage
+
+## Main hypotheses
+
+* What are the countries having the highest number of inventors.
+* What are the relationship of Age and number of inventors in top-3 countries that had the superiority in the number of inventors.
+* What are the countries having the highest number of inventions.
+* What is the percentage of inventors in different categories of the life duration. 
+* Which century had the highest number of of the inventors born.
+* What is the density of different number of inventions(categorized).
+* What is the relationship between average number of inventions and the lifespan of inventors.
+* What is the relationship between Age and Number of inventions(1-2 inventions).
+
+
+# Data Cleaning and Exploring
+
+**The following mining and cleaning steps are performed on the scrapped text data to get a dataset:**
+
+* There have been inventors in the list whose death names aren't known, and the  format of their Born year were different from general format (e.g. born 1638). We have extracted the word born from the Date to get only the numeric value in the future,
+* There have been inventions which have been done as a result of by more than one inventor's work. Usually in such cases the co-inventors have been mentioned after expression *together with* and information about them is ended with comma. So We have separated co-workers as well and demonstrated them as a separate inventor with the same invention,
+* The Born Dates and Death dates have been separated,
+* The country of the inventor has been separated from the invention description,
+* Checks and cleaning have been done for full and partial duplicates in the gained dataset,
+* Rows with unknown inventors(Name is NA) have been cleaned.
+
+*As a result we have gained the following dataset:*
+
+
+```{r echo=F, message=F, warning=F}
+site <- "https://en.wikipedia.org/wiki/List_of_inventors"
+
+li_text <- read_html(site) %>%
+        html_nodes("li") %>%
+        html_text()
+li_text <- li_text[29:1015]
+
+#There are 199 inventors with unknown death date
+#bring the to general pattern (born year - death year)
+born_rmv <- li_text[str_detect(li_text, paste0("\\(","born","\\s[0-9]+\\)"))]
+born_rmv <- str_remove_all(born_rmv, "born ")
+
+li_text <- li_text[!str_detect(li_text, paste0("\\(","born","\\s[0-9]+\\)"))]
+li_text <- c(li_text, born_rmv)
+
+```
+
+```{r echo=F, message=F, warning=F}
+with1 <- li_text[str_detect(li_text, paste0("together with"))]
+li_text <- li_text[!str_detect(li_text, paste0("together with"))]
+
+with2 <- with1
+with2 <- str_remove(with2, "/ ?[a-zA-Z.?]+")
+
+with1 <- str_remove(with1, ".*together with ")
+#selecting country of the second inventor
+with1 <- str_remove(with1, "[a-zA-Z.?]+\\s?/ ?")
+
+
+li_text <- c(li_text, with1, with2)
+```
+
+
+```{r echo=F, message=F, warning=F}
+data <- str_match(li_text, "(\\D*)(\\(\\d+.\\d+\\))\\, (.*)")
+data <- data[,-c(1)]
+```
+
+```{r echo=F, message=F, warning=F}
+
+data[,3] <- str_remove(data[,3], "together with [a-zA-Z\\(\\)0-9–\\s]\\,?")
+
+more_cols <- str_match(data[,3], "([a-zA-Z./]+) – (.*)")
+more_cols <- more_cols[,-c(1)]
+
+data <- as.data.frame(data)
+colnames(data) <- c("Name", "Year", "Invention")
+data$Country <- more_cols[,1]
+data$Invention <- more_cols[,2]
+```
+
+```{r echo=F, message=F, warning=F}
+#Taking into consideration that there are inventors whose Death dates are not known (turn to NA)
+years <- str_match(data$Year, "\\((\\d+)–?(\\d+)?\\)")
+
+data$BornYear <- as.numeric(years[,2])
+data$DeathYear <- as.numeric(years[,3])
+
+data$Name <- str_replace(data$Name, "^(\\W).*", "NA")
+data$Name <- str_trim(data$Name,side = c("right"))
+data <- data[!str_detect(data$Name, "NA"),]
+
+data <- data %>%
+  select(Name, Country, BornYear, DeathYear, Invention)
+```
+
+```{r echo=F, message=F, warning=F}
+#Finding and deleting full duplicates
+data <- data[!duplicated(data),]
+
+#Finding and deleting partial duplicates
+data <- data[!duplicated(data$Name),]
+
+
+#removing all NAs from Name column
+data<- data%>%
+  filter(complete.cases(Name))
+
+```
+
+```{r echo=F, message=F, warning=F}
+
+#The structure of the resulted dataset
+str(data)
+
+```
+
+We can also see the overview of our Dataset in the plot below.\
+According to the plot below Discrete Columns are 60% and the rest are Continuous, there are no missing columns, but the 3.9% of observations is missing in the Dataset, 84.6% rows are complete.
+
+
+```{r echo=F, message=F, warning=F, fig.height=3}
+
+plot_intro(data)
+
+```
+
+________________________________________________________________________________
+
+# More exploratory analysis on Dataset
+
+  *Figure 1 shows the top 20 countries by the number of inventors according to dataset. As we can see the leading country is the U.S. with more than 240 inventors from 913 in our Dataset. The next country is Russia with more than 100 inventors, the third comes the UK. Also, we can note that the range of the number is from 10 to 250 *
+
+```{r echo=F, message=F, warning=F, fig.height=4}
+data%>%
+  select(Name,Country)%>%
+  filter(complete.cases(Country))%>%
+  group_by(Country) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))%>%
+  head(n=20)%>%
+  ggplot(aes(x=reorder(Country,Count),y=Count, fill=Count))+
+  geom_histogram(stat="identity")+
+  labs(title="The top 20 countries by number of inventors", 
+       x="Country", y="Number of inventors",caption="Figure 1")+
+  scale_y_continuous(n.breaks = 10)+
+  coord_flip()+
+  theme_minimal()
+
+```
+
+
+```{r echo=F, message=F, warning=F}
+data<-data%>%
+  mutate(Age = DeathYear-BornYear)
+
+data$Invention<- gsub("\\(([^()]+)\\)", "\\1", str_remove_all(data$Invention, "\\(([^()]+)\\)"))
+data$Invention<- str_replace_all(data$Invention, " and ", ", ")
+
+data<-data%>%
+  mutate(InventonNumber = (str_count(Invention, ",")+1))
+
+```
+
+
+  *Even though we don't see Armenia in the range of top 20 Countries with inventors, we have noticed that there are Armenian inventors in our dataset as well. Let's explore them by the help of the table above(See Table 1: ARMENIAN Inventors).*
+  
+
+```{r echo=F, message=F, warning=F, fig.width=6}
+Name_sub <- data$Name[str_detect(data$Name, "^([\\w]+\\s[\\w]+(yan$|yants$|ian$))$")]
+
+armenian_inventors <- data %>%
+  select(Name, Country, BornYear, Age, Invention) %>%
+  filter(Name %in% Name_sub) 
+
+kable(armenian_inventors, "latex", booktabs = T, caption = "ARMENIAN Inventors") %>%
+  kable_styling(latex_options = "striped") %>%
+  column_spec(1, bold = TRUE, italic = TRUE)%>%
+  column_spec(5, width = "10em")
+
+```
+
+  *As Figure 2 shows we made factoring out of the ages of the inventors described below. The figure is to show the ages of inventors in Russia, US and UK (the top 3 countries with the number of inventors). We can point out that in all countries most of the inventors lived more than 70 years. Mostly the inventors in that lived 40-70 years were from USA (this is connected the huge number of inventors in USA also). In all 3 countries the number of "Young" inventors is equal(there were 3 inventors in each countries from "Young" category). The factorization of age range is as follows:*
+
+Age range | Factor of age
+----------|---------------
+(70, INF) | Aged
+(40,70]   | Middle aged
+(0-40]    | Young
+
+
+
+```{r echo=F, message=F, warning=F, fig.height=4}
+data<- data %>%
+ mutate(AgeFactor = ifelse(Age >70 ,"Aged",
+                      ifelse(Age<=70 & Age>40,"Normal","Young")))
+
+data%>%
+  filter(Country %in% c("U.S.", "Russia","UK") & complete.cases(Country) & complete.cases(AgeFactor)) %>%
+  group_by(Country,AgeFactor)%>%
+  summarise(Count=n())%>%
+  ggplot(aes(x=AgeFactor, y=Count, fill=AgeFactor))+geom_bar(stat="identity")+
+  theme(axis.text.x = element_text(angle = 45))+
+  labs(title = "Relationship between Countries and the lifetime lived ", 
+       x="Age as a Factor", y="Count",caption="Figure 2")+
+  facet_grid(.~Country)
+
+```
+\pagebreak 
+
+*This is for the help to see the numbers of each category.*
+
+```{r echo=F, message=F, warning=F}
+
+data%>%
+  filter(Country %in% c("U.S.", "Russia","UK") & complete.cases(Country) &
+           complete.cases(AgeFactor)) %>%
+  group_by(Country,AgeFactor)%>%
+  summarise(Count=n())
+```
+_______________________________
+
+  *Figure 3 points out the top 20 countries with the number of inventions. To have the visualization we added a new column to the dataframe named InventionNumber. We used the number of commas to do this(also, we converted and's with commas as well to have precise data). The histogram shows the average number of inventions made in countries. We see that Iraq has the most averaged number of inventions. The 2nd country is Romania\\U.S., the 3rd is Iran. We can also denote that Armenia is the 6th position in the plot. *
+
+
+```{r echo=F, message=F, warning=F}
+data%>%
+  select(InventonNumber,Country)%>%
+  filter(complete.cases(Country) & complete.cases(InventonNumber))%>%
+  group_by(Country) %>%
+  summarise(avg_num_of_inv = mean(InventonNumber))%>%
+  arrange(desc(avg_num_of_inv))%>%
+  head(n=20)%>%
+  ggplot(aes(x=reorder(Country,-avg_num_of_inv), y=avg_num_of_inv, fill = cut(avg_num_of_inv, 100)))+
+  geom_histogram(stat="identity", show.legend = F)+
+  scale_fill_discrete(h = c(240, 10), c = 120, l = 70)+
+  theme_minimal()+
+  theme(axis.text.x =element_text(angle=90,hjust = 1))+
+  labs(title="The top 20 countries by number of inventions", 
+       x="Country", y="Number of inventions",caption="Figure 3")
+
+```
+\pagebreak 
+
+  *The pie chart shows the portion of each lifespan category("Aged","Middle-Aged","Young") the inventors had. We can point out that 63% of inventors had a lifespan longer than 70 years, the 34% were middle-aged, and 3% had lived till their 40s. *
+
+```{r echo=F, message=F, warning=F, fig.height=3}
+library(scales)
+dataf<-data%>% 
+  filter(complete.cases(AgeFactor))
+
+bp<-dataf%>% 
+  filter(complete.cases(AgeFactor))%>%
+  group_by(AgeFactor)%>%
+  count() %>% 
+  ungroup() %>% 
+  mutate(per=`n`/sum(`n`)) %>% 
+  arrange(desc(AgeFactor))
+bp$label <- scales::percent(bp$per)
+ggplot(bp)+
+  geom_bar(aes(x="", y=per, fill=AgeFactor), stat="identity", width = 1)+
+  coord_polar("y", start=0)+
+  theme_void()+
+  geom_text(aes(x=1, y = cumsum(per) - per/2, label=label))+
+  labs(title="The percentage of each Age category", caption = "Figure 4")
+ 
+```
+  
+  *To analyse the number of inventors born in each century we added a Century column to the initial dataframe.        The figure 5 shows that most of the inventors lived in 19th century. The second is 20th century, the third with the number of inventors is 18th century. It is imporatant to note that the dataset includes 15 centuries the inventors were born.*
+
+
+
+```{r echo=F, message=F, warning=F}
+data<- data%>%
+  mutate(Century=BornYear%/%100+1)
+
+data%>%
+  select(Century,Name)%>%
+  filter(complete.cases(Name) & complete.cases(Century))%>%
+  group_by(Century) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Century))%>%
+  head(n=20)%>%
+  ggplot(aes(x=reorder(Century,-Count),y=Count, fill = cut(Century, 100)))+
+  geom_histogram(stat="identity", binwidth = 0.5, show.legend = F)+
+  scale_fill_discrete(h = c(240, 10), c = 120, l = 70)+
+  labs(title = "The number of inventors according to century", x="Century", y="Number of inventors", caption = "Figure 5")+ theme_minimal()
+
+```
+
+*Figure 6 is a density plot that shows the number of each category of invention number inventors had. A new column named  InventionNumber_Factor was added to the dataframe.*
+
+
+
+  *The factorization of Invention number is as follows:*
+  
+Invention number | Invention Number category
+---------------- | -------------------------
+(8,INF)          | Very High
+(5;8]            | High
+(3;5]            | Medium
+[1,3]            | Low
+
+  
+  *Most of the inventors had "Medium" amount of inventions, and the least was "Very high" category.*
+
+
+```{r echo=F, message=F, warning=F}
+
+data<- data %>%
+ mutate(InventonNumber_Factor = ifelse(InventonNumber >8 ,"Very High",
+                      ifelse(InventonNumber<8 & InventonNumber>=5 ,"High",
+                             ifelse(InventonNumber<5 & InventonNumber<=3, "Medium","Normal"))))
+
+data%>%
+  filter(complete.cases(InventonNumber_Factor))%>%
+  ggplot( aes(InventonNumber_Factor))+
+  geom_density(aes(fill=factor(InventonNumber_Factor)), alpha=0.9) + 
+    labs(title="Density plot", 
+         subtitle="Invention Number density of inventors",
+         caption="Figure 6",
+         x="Invention Number Factorized",
+         fill="Invention type")+
+  theme_classic()
+
+
+```
+
+*We can also see the number of each category the inventors were.*
+```{r echo=F,  message=F, warning=F}
+
+data%>%
+  filter(complete.cases(InventonNumber_Factor))%>%
+  group_by(InventonNumber_Factor) %>%
+  summarise(Count = n())%>%
+  arrange(desc(Count))
+
+```
+\pagebreak 
+
+ *Figure 7 is an example of faceting. This is most useful when you have two discrete variables, and all combinations of the variables exist in the data. Here we had two factorized variables (InventonNumber_Factor and AgeFactor).  With the help of this we wanted to analyze Invention number in different Age categories. This is a good way of having 3 in 1 plot. The plot shows that in Aged(people living more than 70 years) group in Russia and U.S has huge number of inventions in all categories. As for UK "High" and "Medium" levels of inventions are prevailing. In "Middle-Aged" group we see few less number of inventions than in Aged category. Additionally, in "Young" category we have the least number of inventions. *
+
+```{r echo=F, message=F, warning=F}
+a<-c("Russia", "U.S.","UK")
+data%>%
+  select(Age,AgeFactor, Country, InventonNumber_Factor, InventonNumber) %>%
+  filter(Country %in% a &complete.cases(Country) & complete.cases(InventonNumber_Factor )                                                                  &complete.cases(AgeFactor)&complete.cases(Age)) %>%
+  group_by(AgeFactor,Country,InventonNumber_Factor)%>%
+  summarise(avg_age = mean(Age))%>%
+  arrange(desc(avg_age))%>%
+  head(n=20)%>%
+  ggplot(aes(x=InventonNumber_Factor , y=avg_age, fill=InventonNumber_Factor))+
+  scale_fill_discrete(name = "Invention number factorized")+
+  geom_bar(stat="identity")+
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title = "Relationship between average number of inventions and the lifespan of inventors", 
+       x="Invention number as factor", y="average numer of inventions", caption="Figure 7")+
+  facet_grid(AgeFactor~Country)
+
+```
+
+\pagebreak
+
+*Figure 8 is a scatterplot showing the dependency between Age and Invention Number(from 1-2 inventions). The plot points out that inventors living from 21-38 had on average more than 1.25 inventions. The number of inventions is less when they lived more than 38 years.*
+
+```{r, echo=F, message=F, warning=F, fig.height=4, fig.width=6}
+data%>%
+  filter(complete.cases(Age) & complete.cases(InventonNumber))%>%
+  ggplot(aes(x=Age, y=InventonNumber)) + 
+  geom_point() +
+  geom_smooth(method="loess", se=F) + 
+  xlim(21,106)+ylim(1,2)+
+  labs(subtitle="Age Vs Invention Number", 
+       y="Invention number", 
+       x="Age", 
+       title="Scatterplot", 
+       caption = "Figure 8")
+```
+
+
+  *We can note that the correlation between Age and InventionNumber is negative and close to 0. This means when one variable increases the other decreases, and vice versa. As the number is very close to 0 we can say that  nearly there is no correlation between these variables. Also, we need to note that the calculated value of correlations according to whole observations. While in scatterplot we saw the InventionNumber in the interval of 1-2. *
+```{r echo=F, message=F, warning=F, fig.height=4, fig.width=6}
+filtered_Age_and_InvNum<-data%>%
+  select(Age, InventonNumber)%>%
+  filter(complete.cases(Age) & complete.cases(InventonNumber))
+
+cor(filtered_Age_and_InvNum$Age, filtered_Age_and_InvNum$InventonNumber)
+```
+
+```{r  echo=F, message=F, warning=F}
+#Saving the resulted dataset
+#data$Country<-iconv(data$Country, to="ASCII", sub="")
+
+write.csv(data,"Inventors.csv")
+```
+
+___________________________________________________________________________________________
+
+\pagebreak
+
+## Summary of findings
+
+* The leading country in the number of inventors is the U.S. with more than 240 inventors from 913 in our Dataset. 
+* In all countries most of the inventors lived more than 70 years. Mostly the inventors in that lived 40-70 years were from USA (this is connected the huge number of inventors in USA also). In all 3 countries the number of “Young” inventors is equal.
+* The average number of inventions is made in countries. Iraq has the most averaged number of inventions. The 2nd country is Romania\\U.S., the 3rd is Iran. We can also denote that Armenia is the 6th position in the plot.
+* 63% of inventors had a lifespan longer than 70 years, the 34% were middle-aged, and
+3% had lived till their 40s.
+* Most of the inventors lived in 19th century. The second is 20th century, the
+third with the number of inventors is the 18th century.
+* Most of the inventors had “Medium” amount of inventions, and the least was “Very high” category. Most of the inventors had 4-5 inventions.
+*  Aged(people living more than 70 years) group in Russia and U.S has huge number of inventions in all categories. As for UK “High” and “Medium” levels of inventions are prevailing. In “Middle-Aged” group we see few less number of inventions than in Aged category. Additionally, in “Young” category we have the least number of inventions.
+* Inventors living from 21-38 had on average more than 1.25 inventions. The number
+of inventions is less when they lived more than 38 years.
+
+
