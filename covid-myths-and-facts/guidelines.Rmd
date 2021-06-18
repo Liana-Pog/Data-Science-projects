@@ -1,0 +1,53 @@
+---
+title: "Title of your report"
+author: 'Liana Poghosyan'
+output: pdf_document
+---
+
+DEADLINE: July 20
+
+
+Setup chunk
+call all libraries in this chunk
+set echo=F, message=f, warning=F. Your report should not have any visible R code in the pdf.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, message = F, warning = F)
+library(ggplot2)
+```
+
+
+## The problem/data description
+- Why is this important/interesting
+- The problem statement
+-Where does the data come from?
+-What was done on this data so far
+
+## Main hypotheses
+Here you write what are you trying to find in the data, what are some hypotheses that you are trying to test
+
+## Analysis
+
+## Summary of findings and recommendatins if any
+
+
+
+Some text here
+Plot - all the plots need to have meaningful guides (titles, etc)
+
+plot should have size: fig.width = 4, fig.height = 4. You can change this parameter only if it is very much needed for good visualization.
+
+```{r, fig.width=4, fig.height=4}
+# 
+data(mtcars)
+ggplot(mtcars, aes(hp,mpg)) + geom_point() + 
+  labs(x = "Horsepower", y = 'Miles per gallon', title = 'relationship between mpg and hp')
+```
+
+Again some text. Dont make consecutive plots in a row without any text inside.
+
+
+Overall 6-8 pages.
+
+
