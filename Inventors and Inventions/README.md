@@ -14,12 +14,6 @@ The tasks in this project are
 The **topic of the project** is **Inventors and their Inventions**. The text data about different inventors' *Names, Born year, Death Year, Country* and *Inventions* are scrapped from Wikipedia\
 (https://en.wikipedia.org/wiki/List_of_inventors).
 
-
-The ShinyApp uses analysis done in the project. You can find it in the link below:\
-https://anijeyranyan.shinyapps.io/Group_Homework/
-
-\newpage
-
 ## Main hypotheses
 
 * What are the countries having the highest number of inventors.
